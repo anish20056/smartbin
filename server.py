@@ -34,17 +34,21 @@ logger = logging.getLogger(__name__)
 # ── Global inference engine (loaded once at startup) ──────────────────────────
 classifier: Optional[WasteClassifierInference] = None
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global classifier
-    try:
-        logger.info("Loading WasteViT classifier…")
-        checkpoint = os.environ.get("MODEL_CHECKPOINT", "checkpoints/best_model.pt")
-        classifier = WasteClassifierInference(checkpoint_path=checkpoint)
-        logger.info("Model ready.")
-    except Exception as e:
-        logger.error(f"Model loading failed: {e}")
+    import threading
+    def load_model():
+        global classifier
+        try:
+            logger.info("Loading WasteViT classifier…")
+            checkpoint = os.environ.get("MODEL_CHECKPOINT", "checkpoints/best_model.pt")
+            classifier = WasteClassifierInference(checkpoint_path=checkpoint)
+            logger.info("Model ready.")
+        except Exception as e:
+            logger.error(f"Model loading failed: {e}")
+    thread = threading.Thread(target=load_model)
+    thread.start()
     yield
     logger.info("Shutting down.")
 

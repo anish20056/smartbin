@@ -37,12 +37,14 @@ classifier: Optional[WasteClassifierInference] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model on startup, release on shutdown."""
     global classifier
-    logger.info("Loading WasteViT classifier…")
-    checkpoint = os.environ.get("MODEL_CHECKPOINT", "checkpoints/best_model.pt")  # e.g. "checkpoints/best_model.pt"
-    classifier = WasteClassifierInference(checkpoint_path=checkpoint)
-    logger.info("Model ready.")
+    try:
+        logger.info("Loading WasteViT classifier…")
+        checkpoint = os.environ.get("MODEL_CHECKPOINT", "checkpoints/best_model.pt")
+        classifier = WasteClassifierInference(checkpoint_path=checkpoint)
+        logger.info("Model ready.")
+    except Exception as e:
+        logger.error(f"Model loading failed: {e}")
     yield
     logger.info("Shutting down.")
 

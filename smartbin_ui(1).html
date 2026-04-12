@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Bin AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#010810;font-family:'Share Tech Mono',monospace;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;}
+.sb-root{width:100%;max-width:960px;background:#020b12;border-radius:16px;overflow:hidden;border:1px solid rgba(0,255,247,.2);position:relative;}
+.sb-root::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,255,.015) 2px,rgba(0,255,255,.015) 4px);pointer-events:none;z-index:0;}
+.sb-header{background:#030f18;border-bottom:1px solid rgba(0,255,247,.25);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:relative;z-index:2;flex-wrap:wrap;gap:10px;}
+.sb-logo{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:900;color:#00fff7;letter-spacing:3px;text-shadow:0 0 24px rgba(0,255,247,.7);}
+.sb-logo span{color:#39ff14;}
+.pills{display:flex;gap:10px;flex-wrap:wrap;}
+.pill{font-size:10px;letter-spacing:2px;padding:4px 11px;border-radius:2px;border:1px solid;}
+.p-on{color:#39ff14;border-color:rgba(57,255,20,.4);background:rgba(57,255,20,.07);}
+.p-md{color:#00fff7;border-color:rgba(0,255,247,.27);background:rgba(0,255,247,.07);}
+.p-ac{color:#ff6b35;border-color:rgba(255,107,53,.33);background:rgba(255,107,53,.07);}
+.p-live{color:#39ff14;border-color:rgba(57,255,20,.4);background:rgba(57,255,20,.1);animation:pillBlink 1s ease-in-out infinite;}
+@keyframes pillBlink{0%,100%{opacity:1}50%{opacity:.5}}
+.sb-body{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);position:relative;z-index:1;}
+.sb-left{padding:18px;border-right:1px solid rgba(0,255,247,.12);}
+.sb-right{padding:18px;display:flex;flex-direction:column;gap:14px;}
+.sec-lbl{font-size:9px;letter-spacing:4px;color:rgba(0,255,247,.67);margin-bottom:8px;font-family:'Orbitron',sans-serif;}
+.cam-wrap{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3;border:1px solid rgba(0,255,247,.25);}
+.cam-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(ellipse at 50% 40%,#031a24 0%,#010810 80%);}
+.cam-placeholder svg{opacity:.3;}
+.cam-placeholder p{font-size:11px;letter-spacing:3px;color:rgba(0,255,247,.35);font-family:'Orbitron',sans-serif;text-align:center;line-height:1.8;}
+video{display:none;width:100%;height:100%;object-fit:cover;}
+canvas{display:none;}
+.corner{position:absolute;width:22px;height:22px;border-color:#00fff7;border-style:solid;border-width:0;z-index:10;}
+.c-tl{top:10px;left:10px;border-top-width:2px;border-left-width:2px;}
+.c-tr{top:10px;right:10px;border-top-width:2px;border-right-width:2px;}
+.c-bl{bottom:10px;left:10px;border-bottom-width:2px;border-left-width:2px;}
+.c-br{bottom:10px;right:10px;border-bottom-width:2px;border-right-width:2px;}
+.xhair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:7;}
+.xhair::before,.xhair::after{content:'';position:absolute;background:rgba(0,255,247,.4);}
+.xhair::before{width:40px;height:1px;top:0;left:-20px;}
+.xhair::after{width:1px;height:40px;top:-20px;left:0;}
+.scanline{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent 0%,#00fff7 30%,#39ff14 50%,#00fff7 70%,transparent 100%);animation:scanAnim 1.6s linear infinite;box-shadow:0 0 14px #00fff7;z-index:6;display:none;}
+@keyframes scanAnim{0%{top:5%}100%{top:95%}}
+.scan-flash{position:absolute;inset:0;background:rgba(57,255,20,.07);opacity:0;pointer-events:none;z-index:8;}
+.scan-flash.flash{animation:flashAnim .25s ease-out;}
+@keyframes flashAnim{0%{opacity:.6}100%{opacity:0}}
+.live-ind{position:absolute;top:10px;left:10px;display:none;align-items:center;gap:6px;background:rgba(0,0,0,.65);border:1px solid rgba(255,0,0,.45);padding:3px 9px;border-radius:2px;font-size:10px;color:#ff4444;letter-spacing:2px;z-index:10;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#ff4444;animation:blink 1s step-end infinite;}
+@keyframes blink{50%{opacity:0}}
+.scan-ring{position:absolute;inset:0;border-radius:10px;border:2px solid transparent;pointer-events:none;}
+.scan-ring.on{border-color:rgba(57,255,20,.4);animation:ringP .8s ease-in-out infinite alternate;}
+@keyframes ringP{from{border-color:rgba(57,255,20,.1)}to{border-color:rgba(57,255,20,.8)}}
+.cam-lbl{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,255,247,.15);border:1px solid rgba(0,255,247,.45);color:#00fff7;font-size:10px;padding:3px 14px;border-radius:2px;letter-spacing:2px;backdrop-filter:blur(4px);z-index:10;white-space:nowrap;display:none;}
+.btn-row{display:flex;gap:8px;margin-top:12px;}
+.sb-btn{flex:1;padding:11px;font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;border-radius:3px;cursor:pointer;border:1px solid;transition:all .2s;font-weight:700;}
+.sb-btn:active{transform:scale(.97);}
+.btn-start{background:rgba(0,255,247,.07);border-color:#00fff7;color:#00fff7;}
+.btn-start:hover{background:rgba(0,255,247,.15);box-shadow:0 0 16px rgba(0,255,247,.3);}
+.btn-stop{background:rgba(255,68,68,.07);border-color:#ff4444;color:#ff4444;}
+.btn-stop:hover{background:rgba(255,68,68,.15);}
+.btn-scan{background:rgba(57,255,20,.07);border-color:#39ff14;color:#39ff14;}
+.btn-scan:hover:not(:disabled){background:rgba(57,255,20,.15);box-shadow:0 0 16px rgba(57,255,20,.3);}
+.btn-scan:disabled{opacity:.3;cursor:not-allowed;}
+.steps-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:10px;}
+.step-item{display:flex;align-items:center;gap:6px;font-size:10px;color:rgba(0,255,247,.25);padding:5px 8px;border:1px solid rgba(0,255,247,.06);border-radius:3px;background:rgba(0,255,247,.015);transition:all .3s;}
+.step-item.done{color:rgba(0,255,247,.6);border-color:rgba(0,255,247,.18);}
+.step-item.active{color:#39ff14;border-color:rgba(57,255,20,.45);background:rgba(57,255,20,.08);box-shadow:0 0 8px rgba(57,255,20,.15);}
+.step-num{font-family:'Orbitron',sans-serif;font-size:9px;color:inherit;min-width:14px;}
+.result-panel{background:#030f18;border:1px solid rgba(0,255,247,.2);border-radius:10px;padding:16px;min-height:210px;position:relative;overflow:hidden;}
+.result-panel::before{content:'';position:absolute;top:-40px;right:-40px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,var(--rg,rgba(0,255,247,.06)) 0%,transparent 70%);pointer-events:none;}
+.result-idle{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:170px;gap:10px;}
+.result-idle-text{font-size:11px;color:rgba(0,255,247,.25);letter-spacing:2px;text-align:center;line-height:1.9;}
+.r-cat{font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;letter-spacing:3px;margin-bottom:4px;}
+.r-name{font-size:11px;letter-spacing:2px;margin-bottom:14px;}
+.conf-row{margin-bottom:8px;}
+.conf-top{display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;letter-spacing:1px;}
+.conf-track{height:5px;background:rgba(255,255,255,.05);border-radius:1px;overflow:hidden;}
+.conf-fill{height:100%;border-radius:1px;transition:width .9s cubic-bezier(.22,1,.36,1);}
+.tip-box{margin-top:12px;border-left:2px solid #00fff7;padding:8px 12px;background:rgba(0,255,247,.03);border-radius:0 4px 4px 0;font-size:11px;color:rgba(0,255,247,.8);line-height:1.7;}
+.tip-lbl{font-size:9px;letter-spacing:3px;color:#00fff7;font-family:'Orbitron',sans-serif;margin-bottom:4px;}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;}
+.metric-box{background:rgba(255,255,255,.02);border:1px solid rgba(0,255,247,.12);border-radius:4px;padding:8px 6px;text-align:center;}
+.metric-val{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:#00fff7;}
+.metric-lbl{font-size:9px;color:rgba(0,255,247,.4);letter-spacing:1px;margin-top:2px;}
+.hist-panel{background:#030f18;border:1px solid rgba(0,255,247,.13);border-radius:10px;padding:12px;flex:1;}
+.hist-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(0,255,247,.06);font-size:11px;}
+.hist-row:last-child{border-bottom:none;}
+.hist-name{color:rgba(255,255,255,.6);}
+.hist-badge{font-size:9px;letter-spacing:1px;padding:2px 8px;border-radius:2px;font-family:'Orbitron',sans-serif;font-weight:700;}
+.hb-r{background:rgba(57,255,20,.12);color:#39ff14;border:1px solid rgba(57,255,20,.3);}
+.hb-c{background:rgba(255,107,53,.12);color:#ff6b35;border:1px solid rgba(255,107,53,.3);}
+.hb-l{background:rgba(255,68,68,.12);color:#ff4444;border:1px solid rgba(255,68,68,.3);}
+.status-box{margin-top:10px;padding:8px 12px;border-radius:4px;font-size:10px;letter-spacing:1px;line-height:1.7;}
+.status-ok{background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.25);color:rgba(57,255,20,.8);}
+.status-err{background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.25);color:rgba(255,68,68,.8);}
+.err-box{background:rgba(255,0,0,.07);border:1px solid #ff4444;border-radius:4px;padding:10px 12px;font-size:11px;color:#ff6666;line-height:1.7;margin-top:10px;display:none;}
+@media(max-width:640px){.sb-body{grid-template-columns:1fr;}.sb-left{border-right:none;border-bottom:1px solid rgba(0,255,247,.12);}}
+</style>
+</head>
+<body>
+<div class="sb-root">
+  <div class="sb-header">
+    <div class="sb-logo">SMART<span>BIN</span> AI</div>
+    <div class="pills">
+      <div class="pill p-on">● ONLINE</div>
+      <div class="pill p-md">ViT-B/16</div>
+      <div class="pill p-ac">ACC 98%</div>
+      <div class="pill p-live">● LIVE AI</div>
+    </div>
+  </div>
+  <div class="sb-body">
+    <div class="sb-left">
+      <div class="sec-lbl">// CAMERA FEED</div>
+      <div class="cam-wrap">
+        <div class="cam-placeholder" id="placeholder">
+          <svg width="48" height="48" fill="none" stroke="#00fff7" stroke-width="1" viewBox="0 0 24 24">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <p>CLICK START CAM<br>TO BEGIN</p>
+        </div>
+        <video id="vid" autoplay playsinline></video>
+        <canvas id="snapCanvas"></canvas>
+        <div class="corner c-tl"></div><div class="corner c-tr"></div>
+        <div class="corner c-bl"></div><div class="corner c-br"></div>
+        <div class="xhair"></div>
+        <div class="scanline" id="scanline"></div>
+        <div class="scan-flash" id="scanFlash"></div>
+        <div class="live-ind" id="liveInd"><div class="live-dot"></div><span>REC</span></div>
+        <div class="cam-lbl" id="camLbl"></div>
+        <div class="scan-ring" id="scanRing"></div>
+      </div>
+      <div class="err-box" id="errBox"></div>
+      <div id="apiStatus"></div>
+      <div class="btn-row">
+        <button class="sb-btn btn-start" id="startBtn" onclick="startCam()">▶ START CAM</button>
+        <button class="sb-btn btn-stop" id="stopBtn" onclick="stopCam()" style="display:none;">■ STOP</button>
+        <button class="sb-btn btn-scan" id="scanBtn" onclick="doScan()" disabled>⬡ SCAN + AI</button>
+      </div>
+      <div class="sec-lbl" style="margin-top:16px;">// NEURAL PIPELINE</div>
+      <div class="steps-grid" id="stepsGrid"></div>
+    </div>
+    <div class="sb-right">
+      <div>
+        <div class="sec-lbl">// CLASSIFICATION OUTPUT</div>
+        <div class="result-panel" id="resultPanel">
+          <div class="result-idle" id="resultIdle">
+            <svg width="32" height="32" fill="none" stroke="rgba(0,255,247,.25)" stroke-width="1" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+            </svg>
+            <div class="result-idle-text">START THE CAMERA<br>POINT AT WASTE<br>CLICK ⬡ SCAN + AI</div>
+          </div>
+          <div id="resultContent" style="display:none;"></div>
+        </div>
+      </div>
+      <div>
+        <div class="sec-lbl">// SCAN HISTORY</div>
+        <div class="hist-panel" id="histPanel">
+          <div style="text-align:center;padding:1rem 0;font-size:11px;color:rgba(0,255,247,.2);letter-spacing:2px;">NO RECORDS YET</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const API_URL="http://localhost:8000";
+const STEPS=["FRAME CAPTURE","RESIZE 224x224","NORMALISE","PATCH EMBED","ViT ATTENTION","MLP HEAD","FC CLASSIFY","SOFTMAX","RESULT"];
+const BIN_EMOJI={Recyclable:"♻️",Compost:"🌱",Landfill:"🗑️"};
+const CAT_COLOR={Recyclable:"#39ff14",Compost:"#ff6b35",Landfill:"#ff4444"};
+const CAT_BG={Recyclable:"rgba(57,255,20,.07)",Compost:"rgba(255,107,53,.07)",Landfill:"rgba(255,68,68,.07)"};
+const CAT_GLOW={Recyclable:"rgba(57,255,20,.14)",Compost:"rgba(255,107,53,.14)",Landfill:"rgba(255,68,68,.14)"};
+const HIST_CLS={Recyclable:"hb-r",Compost:"hb-c",Landfill:"hb-l"};
+let scanning=false,camStream=null,history=[];
+const g=id=>document.getElementById(id);
+
+function renderSteps(a){
+  g('stepsGrid').innerHTML=STEPS.map((s,i)=>{
+    const c=i<a?'done':i===a?'active':'';
+    return`<div class="step-item ${c}"><span class="step-num">0${i+1}</span><span>${s}</span></div>`;
+  }).join('');
+}
+renderSteps(-1);
+
+async function checkAPI(){
+  try{
+    const r=await fetch(`${API_URL}/health`,{signal:AbortSignal.timeout(3000)});
+    const d=await r.json();
+    g('apiStatus').className='status-box status-ok';
+    g('apiStatus').textContent=d.model_ready?'✅ API ONLINE — Model ready (98% accuracy)':'⚠ API running but model not loaded';
+  }catch(e){
+    g('apiStatus').className='status-box status-err';
+    g('apiStatus').innerHTML='❌ API offline — run: python -m uvicorn server:app --port 8000';
+  }
+}
+checkAPI();
+
+async function startCam(){
+  g('errBox').style.display='none';
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    const v=g('vid');
+    v.srcObject=camStream;v.style.display='block';
+    g('placeholder').style.display='none';
+    g('liveInd').style.display='flex';
+    g('startBtn').style.display='none';
+    g('stopBtn').style.display='inline-block';
+    g('scanBtn').disabled=false;
+  }catch(e){
+    const msg=e.name==='NotAllowedError'?'Camera permission denied — allow it in browser settings.':
+              e.name==='NotFoundError'?'No camera found on this device.':
+              e.name==='NotReadableError'?'Camera is in use by another app.':'Camera error: '+e.message;
+    g('errBox').textContent='⚠ '+msg;
+    g('errBox').style.display='block';
+  }
+}
+
+function stopCam(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  g('vid').style.display='none';
+  g('placeholder').style.display='flex';
+  g('liveInd').style.display='none';
+  g('startBtn').style.display='inline-block';
+  g('stopBtn').style.display='none';
+  g('scanBtn').disabled=true;
+  g('camLbl').style.display='none';
+  renderSteps(-1);
+}
+
+function captureFrame(){
+  const v=g('vid'),c=g('snapCanvas');
+  c.width=v.videoWidth||640;c.height=v.videoHeight||480;
+  c.getContext('2d').drawImage(v,0,0);
+  return c.toDataURL('image/jpeg',0.85).split(',')[1];
+}
+
+async function doScan(){
+  if(scanning||!camStream)return;
+  scanning=true;
+  const b64=captureFrame();
+  g('scanline').style.display='block';
+  g('scanRing').className='scan-ring on';
+  g('resultIdle').style.display='none';
+  g('resultContent').style.display='none';
+  g('resultContent').innerHTML='';
+  g('errBox').style.display='none';
+  const flash=g('scanFlash');
+  flash.classList.remove('flash');void flash.offsetWidth;flash.classList.add('flash');
+  let step=0;renderSteps(0);
+  const t=setInterval(()=>{step++;renderSteps(step);if(step>=STEPS.length-1)clearInterval(t);},280);
+  try{
+    await new Promise(r=>setTimeout(r,STEPS.length*280));
+    const res=await fetch(`${API_URL}/classify/base64`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({image_b64:b64,filename:'frame.jpg'})
+    });
+    if(!res.ok)throw new Error(`Server error ${res.status}`);
+    const data=await res.json();
+    g('scanline').style.display='none';
+    g('scanRing').className='scan-ring';
+    showResult(data);addHistory(data);
+    g('camLbl').textContent=data.label.toUpperCase();
+    g('camLbl').style.display='block';
+  }catch(e){
+    clearInterval(t);
+    g('scanline').style.display='none';
+    g('scanRing').className='scan-ring';
+    g('resultIdle').style.display='flex';
+    g('errBox').innerHTML='❌ Classification failed: '+e.message;
+    g('errBox').style.display='block';
+    renderSteps(-1);
+  }
+  scanning=false;
+}
+
+function showResult(data){
+  const label=data.label,c=CAT_COLOR[label],bg=CAT_BG[label],emoji=BIN_EMOJI[label],probs=data.probabilities;
+  g('resultPanel').style.setProperty('--rg',CAT_GLOW[label]);
+  const bars=['Recyclable','Compost','Landfill'].map(cat=>{
+    const pct=Math.round((probs[cat]||0)*100),fc=CAT_COLOR[cat];
+    return`<div class="conf-row"><div class="conf-top"><span style="color:${fc};letter-spacing:2px;">${cat.toUpperCase()}</span>
+    <span style="color:${cat===label?fc:'rgba(255,255,255,.25)'};font-family:'Orbitron',sans-serif;font-size:11px;">${pct}%</span></div>
+    <div class="conf-track"><div class="conf-fill" style="width:${pct}%;background:${fc};box-shadow:0 0 6px ${fc}88;"></div></div></div>`;
+  }).join('');
+  const unc=data.is_uncertain?`<div style="margin-top:8px;padding:6px 10px;background:rgba(255,230,0,.08);border:1px solid rgba(255,230,0,.3);border-radius:3px;font-size:10px;color:#ffe600;letter-spacing:1px;">⚠ LOW CONFIDENCE — Please verify manually</div>`:'';
+  g('resultContent').innerHTML=`
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+      <div>
+        <div style="font-size:28px;margin-bottom:4px;">${emoji}</div>
+        <div class="r-cat" style="color:${c};text-shadow:0 0 20px ${c}88;">${label.toUpperCase()}</div>
+        <div class="r-name" style="color:${c}88;">DETECTED WASTE ITEM</div>
+      </div>
+      <div style="background:${bg};border:1px solid ${c}55;border-radius:4px;padding:6px 12px;text-align:center;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:18px;color:${c};">${Math.round(data.confidence*100)}%</div>
+        <div style="font-size:9px;color:${c}88;letter-spacing:1px;">CONF</div>
+      </div>
+    </div>
+    ${bars}${unc}
+    <div class="tip-box"><div class="tip-lbl">// AI TIP</div>${data.contamination_tip}</div>
+    <div class="metrics-row">
+      <div class="metric-box"><div class="metric-val">${data.inference_ms||'--'}ms</div><div class="metric-lbl">INFERENCE</div></div>
+      <div class="metric-box"><div class="metric-val">ViT-B</div><div class="metric-lbl">MODEL</div></div>
+      <div class="metric-box"><div class="metric-val">EDGE</div><div class="metric-lbl">DEPLOY</div></div>
+    </div>`;
+  g('resultContent').style.display='block';
+}
+
+function addHistory(data){
+  history.unshift({label:data.label,emoji:BIN_EMOJI[data.label],conf:Math.round(data.confidence*100),time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+  if(history.length>6)history.pop();
+  g('histPanel').innerHTML=history.map(h=>`
+    <div class="hist-row">
+      <span class="hist-name">${h.emoji} ${h.label} Item</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="hist-badge ${HIST_CLS[h.label]}">${h.label.toUpperCase()}</span>
+        <span style="color:rgba(0,255,247,.25);font-size:10px;">${h.time}</span>
+      </div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "remap": {
+    "Cardboard": "Recyclable",
+    "Glass": "Recyclable",
+    "Metal": "Recyclable",
+    "Paper": "Recyclable",
+    "Plastic": "Recyclable",
+    "Food Organics": "Compost",
+    "Vegetation": "Compost",
+    "Miscellaneous Trash": "Landfill",
+    "Textile Trash": "Landfill"
+  },
+  "item_names": {
+    "Cardboard": "Cardboard / Box",
+    "Glass": "Glass Bottle / Jar",
+    "Metal": "Metal Can / Tin",
+    "Paper": "Paper / Newspaper",
+    "Plastic": "Plastic Bottle / Container",
+    "Food Organics": "Food Scraps / Organics",
+    "Vegetation": "Vegetation / Leaves",
+    "Miscellaneous Trash": "Mixed / Miscellaneous Trash",
+    "Textile Trash": "Textile / Fabric"
+  }
+}

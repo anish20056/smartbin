@@ -2,22 +2,30 @@ import streamlit as st
 import streamlit.components.v1 as components
 import threading
 import uvicorn
-from server import app as fastapi_app
+import time
 
-def run_api():
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
-
-thread = threading.Thread(target=run_api, daemon=True)
-thread.start()
 st.set_page_config(page_title="Smart Bin AI", page_icon="♻️", layout="wide")
 
-# Hide streamlit default UI
+# Hide streamlit default UI — keep deploy button visible
 st.markdown("""
 <style>
 #MainMenu, footer {display:none!important;}
 .block-container {padding:0!important;max-width:100%!important;}
 </style>
 """, unsafe_allow_html=True)
+
+# ── Start FastAPI backend in background thread ─────────────────────────────────
+@st.cache_resource
+def start_backend():
+    from server import app as fastapi_app
+    def run():
+        uvicorn.run(fastapi_app, host="0.0.0.0", port=8000, log_level="error")
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    time.sleep(3)  # give server time to start
+    return "started"
+
+start_backend()
 
 HTML = """
 <!DOCTYPE html>
@@ -115,8 +123,11 @@ canvas{display:none;}
 .status-box{margin-top:10px;padding:8px 12px;border-radius:4px;font-size:10px;letter-spacing:1px;line-height:1.7;}
 .status-ok{background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.25);color:rgba(57,255,20,.8);}
 .status-err{background:rgba(255,68,68,.06);border:1px solid rgba(255,68,68,.25);color:rgba(255,68,68,.8);}
-.err-box{background:rgba(255,0,0,.07);border:1px solid #ff4444;border-radius:4px;padding:10px 12px;font-size:11px;color:#ff6666;line-height:1.7;margin-top:10px;display:none;}
-@media(max-width:640px){.sb-body{grid-template-columns:1fr;}.sb-left{border-right:none;border-bottom:1px solid rgba(0,255,247,.12);}}
+.err-box{display:none;margin-top:8px;padding:8px 12px;background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.3);border-radius:4px;font-size:10px;color:#ff6b6b;letter-spacing:1px;}
+@media(max-width:600px){
+  .sb-body{grid-template-columns:1fr;}
+  .sb-left{border-right:none;border-bottom:1px solid rgba(0,255,247,.12);}
+}
 </style>
 </head>
 <body>
@@ -124,40 +135,36 @@ canvas{display:none;}
   <div class="sb-header">
     <div class="sb-logo">SMART<span>BIN</span> AI</div>
     <div class="pills">
-      <div class="pill p-on">● ONLINE</div>
-      <div class="pill p-md">ViT-B/16</div>
-      <div class="pill p-ac">ACC 98%</div>
-      <div class="pill p-live">● LIVE AI</div>
+      <span class="pill p-on">● ONLINE</span>
+      <span class="pill p-md">VIT-B/16</span>
+      <span class="pill p-ac">ACC 98%</span>
+      <span class="pill p-live">● LIVE AI</span>
     </div>
   </div>
   <div class="sb-body">
     <div class="sb-left">
       <div class="sec-lbl">// CAMERA FEED</div>
-      <div class="cam-wrap">
-        <div class="cam-placeholder" id="placeholder">
-          <svg width="48" height="48" fill="none" stroke="#00fff7" stroke-width="1" viewBox="0 0 24 24">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-            <circle cx="12" cy="13" r="4"/>
-          </svg>
-          <p>CLICK START CAM<br>TO BEGIN</p>
-        </div>
-        <video id="vid" autoplay playsinline></video>
-        <canvas id="snapCanvas"></canvas>
+      <div class="cam-wrap" id="camWrap">
         <div class="corner c-tl"></div><div class="corner c-tr"></div>
         <div class="corner c-bl"></div><div class="corner c-br"></div>
         <div class="xhair"></div>
         <div class="scanline" id="scanline"></div>
         <div class="scan-flash" id="scanFlash"></div>
-        <div class="live-ind" id="liveInd"><div class="live-dot"></div><span>REC</span></div>
-        <div class="cam-lbl" id="camLbl"></div>
         <div class="scan-ring" id="scanRing"></div>
+        <div class="live-ind" id="liveInd"><div class="live-dot"></div>LIVE</div>
+        <div class="cam-placeholder" id="placeholder">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#00fff7" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <p>CLICK START CAM<br>TO BEGIN</p>
+        </div>
+        <video id="vid" autoplay playsinline muted></video>
+        <canvas id="snapCanvas"></canvas>
+        <div class="cam-lbl" id="camLbl"></div>
       </div>
-      <div class="err-box" id="errBox"></div>
-      <div id="apiStatus"></div>
+      <div id="errBox" class="err-box"></div>
       <div class="btn-row">
-        <button class="sb-btn btn-start" id="startBtn" onclick="startCam()">&#9654; START CAM</button>
-        <button class="sb-btn btn-stop" id="stopBtn" onclick="stopCam()" style="display:none;">&#9632; STOP</button>
-        <button class="sb-btn btn-scan" id="scanBtn" onclick="doScan()" disabled>&#11041; SCAN + AI</button>
+        <button class="sb-btn btn-start" id="startBtn" onclick="startCam()">▶ START CAM</button>
+        <button class="sb-btn btn-stop" id="stopBtn" onclick="stopCam()" style="display:none">■ STOP</button>
+        <button class="sb-btn btn-scan" id="scanBtn" onclick="doScan()" disabled>⬡ SCAN + AI</button>
       </div>
       <div class="sec-lbl" style="margin-top:16px;">// NEURAL PIPELINE</div>
       <div class="steps-grid" id="stepsGrid"></div>
@@ -167,52 +174,52 @@ canvas{display:none;}
         <div class="sec-lbl">// CLASSIFICATION OUTPUT</div>
         <div class="result-panel" id="resultPanel">
           <div class="result-idle" id="resultIdle">
-            <svg width="32" height="32" fill="none" stroke="rgba(0,255,247,.25)" stroke-width="1" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
-            </svg>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(0,255,247,.2)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <div class="result-idle-text">START THE CAMERA<br>POINT AT WASTE<br>CLICK SCAN + AI</div>
           </div>
-          <div id="resultContent" style="display:none;"></div>
+          <div id="resultContent" style="display:none"></div>
         </div>
       </div>
       <div>
         <div class="sec-lbl">// SCAN HISTORY</div>
         <div class="hist-panel" id="histPanel">
-          <div style="text-align:center;padding:1rem 0;font-size:11px;color:rgba(0,255,247,.2);letter-spacing:2px;">NO RECORDS YET</div>
+          <div style="text-align:center;color:rgba(0,255,247,.2);font-size:10px;letter-spacing:2px;padding:20px 0;">NO RECORDS YET</div>
         </div>
       </div>
+      <div id="apiStatus" class="status-box status-err">⏳ Connecting to AI engine...</div>
     </div>
   </div>
 </div>
 <script>
-const API_URL="http://localhost:8000";
-const STEPS=["FRAME CAPTURE","RESIZE 224x224","NORMALISE","PATCH EMBED","ViT ATTENTION","MLP HEAD","FC CLASSIFY","SOFTMAX","RESULT"];
-const BIN_EMOJI={Recyclable:"&#9851;",Compost:"&#127807;",Landfill:"&#128465;"};
-const CAT_COLOR={Recyclable:"#39ff14",Compost:"#ff6b35",Landfill:"#ff4444"};
-const CAT_BG={Recyclable:"rgba(57,255,20,.07)",Compost:"rgba(255,107,53,.07)",Landfill:"rgba(255,68,68,.07)"};
-const CAT_GLOW={Recyclable:"rgba(57,255,20,.14)",Compost:"rgba(255,107,53,.14)",Landfill:"rgba(255,68,68,.14)"};
-const HIST_CLS={Recyclable:"hb-r",Compost:"hb-c",Landfill:"hb-l"};
-let scanning=false,camStream=null,history=[];
-const g=id=>document.getElementById(id);
-function renderSteps(a){
-  g('stepsGrid').innerHTML=STEPS.map((s,i)=>{
-    const c=i<a?'done':i===a?'active':'';
+const API_URL='http://localhost:8000';
+const STEPS=['FRAME CAPTURE','RESIZE 224x224','NORMALISE','PATCH EMBED','VIT ATTENTION','MLP HEAD','FC CLASSIFY','SOFTMAX'];
+const CAT_COLOR={Recyclable:'#39ff14',Compost:'#ff6b35',Landfill:'#ff4444'};
+const CAT_BG={Recyclable:'rgba(57,255,20,.08)',Compost:'rgba(255,107,53,.08)',Landfill:'rgba(255,68,68,.08)'};
+const CAT_GLOW={Recyclable:'rgba(57,255,20,.12)',Compost:'rgba(255,107,53,.12)',Landfill:'rgba(255,68,68,.12)'};
+const BIN_EMOJI={Recyclable:'♻️',Compost:'🌱',Landfill:'🗑️'};
+const HIST_CLS={Recyclable:'hb-r',Compost:'hb-c',Landfill:'hb-l'};
+let camStream=null,scanning=false,history=[];
+function g(id){return document.getElementById(id);}
+function renderSteps(active){
+  g('stepsGrid').innerHTML=STEPS.map(function(s,i){
+    const c=i<active?'done':i===active?'active':'';
     return'<div class="step-item '+c+'"><span class="step-num">0'+(i+1)+'</span><span>'+s+'</span></div>';
   }).join('');
 }
 renderSteps(-1);
 async function checkAPI(){
   try{
-    const r=await fetch(API_URL+'/health',{signal:AbortSignal.timeout(3000)});
+    const r=await fetch(API_URL+'/health',{signal:AbortSignal.timeout(5000)});
     const d=await r.json();
     g('apiStatus').className='status-box status-ok';
-    g('apiStatus').textContent=d.model_ready?'✅ API ONLINE — Model ready (98% accuracy)':'⚠ API running but model not loaded';
+    g('apiStatus').textContent=d.model_ready?'✅ API ONLINE — Model ready (98% accuracy)':'⚠ API running but model loading...';
   }catch(e){
     g('apiStatus').className='status-box status-err';
     g('apiStatus').textContent='❌ API offline — run: python -m uvicorn server:app --port 8000';
   }
 }
 checkAPI();
+setInterval(checkAPI, 10000);
 async function startCam(){
   g('errBox').style.display='none';
   try{

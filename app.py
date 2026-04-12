@@ -1,6 +1,14 @@
 import streamlit as st
 import streamlit.components.v1 as components
+import threading
+import uvicorn
+from server import app as fastapi_app
 
+def run_api():
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8000)
+
+thread = threading.Thread(target=run_api, daemon=True)
+thread.start()
 st.set_page_config(page_title="Smart Bin AI", page_icon="♻️", layout="wide")
 
 # Hide streamlit default UI

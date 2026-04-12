@@ -178,7 +178,7 @@ async def classify_base64(body: Base64Request):
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-  port = int(os.environ.get("PORT" , 10000))
+    port = int(os.environ.get("PORT" , 10000))
     uvicorn.run(
         "api.server:app",
         host="0.0.0.0",

@@ -1,1 +1,9 @@
 streamlit
+fastapi
+uvicorn
+pillow
+torch
+torchvision
+transformers
+python-multipart
+numpy

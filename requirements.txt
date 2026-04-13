@@ -7,3 +7,4 @@ torchvision
 transformers
 python-multipart
 numpy
+google-generativeai

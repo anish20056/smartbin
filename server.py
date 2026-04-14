@@ -103,9 +103,13 @@ def gemini_identify(image: Image.Image) -> tuple:
     Returns (description, suggested_label)
     """
     try:
-        prompt = """You are a waste classification expert. Look at this image and:
-1. Identify what object(s) you see in 1 sentence
-2. Classify it as exactly one of: Recyclable, Compost, or Landfill
+       prompt = """You are a waste classification expert. Look at this image and classify the waste item.
+
+RULES:
+- Paper, newspaper, cardboard, books, notebooks, question papers = Recyclable
+- Food waste, fruit peels, vegetables, cotton, wool = Compost  
+- Plastic bags, styrofoam, broken glass, electronics = Landfill
+- Plastic bottles, cans, glass bottles, metal = Recyclable
 
 Respond in this exact format:
 OBJECT: <what you see>

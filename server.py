@@ -22,7 +22,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
-import google.generativeai as genai
+from google import genai
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -34,8 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configure Gemini Vision ────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCnUp9Iz6d3I7g_j608pMP81tplAqZTiSo")
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ── Global inference engine ────────────────────────────────────────────────────
 classifier: Optional[WasteClassifierInference] = None
@@ -112,7 +111,10 @@ OBJECT: <what you see>
 CATEGORY: <Recyclable or Compost or Landfill>
 REASON: <one sentence why>"""
 
-        response = gemini_model.generate_content([prompt, image])
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[prompt, image]
+        )
         text = response.text.strip()
         logger.info(f"Gemini raw response: {text}")
 
@@ -134,7 +136,10 @@ REASON: <one sentence why>"""
         # Double check if Gemini says Landfill
         if gemini_label == "Landfill":
             verify_prompt = f"The item is: {description}. Is it DEFINITELY non-recyclable landfill waste? If it could be recycled or composted, change the category. Reply only one word: Recyclable, Compost, or Landfill"
-            verify = gemini_model.generate_content(verify_prompt)
+            verify = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=verify_prompt
+            )
             verified = verify.text.strip()
             if verified in CLASSES:
                 logger.info(f"Landfill double-check result: {verified}")

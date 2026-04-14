@@ -90,19 +90,10 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
 def gemini_identify(image: Image.Image) -> tuple:
     """Use Gemini Vision to identify the object and suggest waste category."""
     try:
-        prompt = """You are a waste classification expert. Look at the MAIN OBJECT in the CENTER of this image. Ignore hands, body, background, and surroundings.
-
-STRICT RULES:
-- Electronic devices, batteries, cables, phones, remotes, gadgets, electric items = Landfill
-- Plastic bottles, cans, glass bottles, metal tins, cardboard, paper, newspaper = Recyclable
-- Food waste, fruit peels, banana, vegetables, coffee grounds, eggshells = Compost
-- Cotton, wool, natural fabric, handkerchief = Compost
-- Plastic bags, styrofoam, chips packets, mixed waste = Landfill
-
-Respond in this exact format:
-OBJECT: <main object only, ignore background>
-CATEGORY: <Recyclable or Compost or Landfill>
-REASON: <one sentence why>"""
+       - Paper, newspaper, cardboard, printed paper, white paper, exam paper, question paper, any paper = Recyclable
+- Banana (eaten or not), fruit (eaten or not), vegetables, food waste, fruit peels = Compost
+- Cotton, wool, handkerchief = Compost
+- Fresh fruit like banana = Compost (it will become waste)
 
         response = client.models.generate_content(
             model="gemini-2.0-flash",

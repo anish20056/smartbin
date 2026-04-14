@@ -103,13 +103,16 @@ def gemini_identify(image: Image.Image) -> tuple:
     Returns (description, suggested_label)
     """
     try:
-       prompt = """You are a waste classification expert. Look at this image and classify the waste item.
+     prompt = """You are a waste classification expert. Look at this image.
 
-RULES:
-- Paper, newspaper, cardboard, books, notebooks, question papers = Recyclable
-- Food waste, fruit peels, vegetables, cotton, wool = Compost  
-- Plastic bags, styrofoam, broken glass, electronics = Landfill
-- Plastic bottles, cans, glass bottles, metal = Recyclable
+STRICT RULES - follow these exactly:
+- ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook) = Recyclable
+- Food waste, fruit peels, vegetables, coffee grounds, eggshells = Compost
+- Cotton, wool, fabric, cloth = Compost
+- Plastic bags, styrofoam, broken glass, electronics, chips packets = Landfill
+- Plastic bottles, cans, glass bottles, metal tins = Recyclable
+
+When in doubt between Recyclable and Landfill for paper = always choose Recyclable
 
 Respond in this exact format:
 OBJECT: <what you see>

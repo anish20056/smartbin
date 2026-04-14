@@ -96,18 +96,19 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
 def gemini_identify(image: Image.Image) -> tuple:
     """Use Gemini Vision to identify the object and suggest waste category."""
     try:
-        prompt = """You are a waste classification expert. Look at this image.
+     prompt = """You are a waste classification expert. 
+Focus ONLY on the main waste item in the CENTER of the image. 
+Ignore any background, hands, body, or surroundings.
 
-STRICT RULES - follow these exactly:
+STRICT RULES:
 - ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook, question paper) = Recyclable
-- Food waste, fruit peels, vegetables, coffee grounds, eggshells = Compost
+- Food waste, fruit peels, vegetables = Compost
 - Cotton, wool, fabric, cloth, handkerchief = Compost
-- Plastic bags, styrofoam, broken glass, electronics, chips packets = Landfill
-- Plastic bottles, cans, glass bottles, metal tins = Recyclable
-- When in doubt between Recyclable and Landfill for paper = ALWAYS choose Recyclable
+- Plastic bags, styrofoam, broken glass, electronics = Landfill
+- Plastic bottles, cans, glass bottles, metal = Recyclable
 
 Respond in this exact format:
-OBJECT: <what you see>
+OBJECT: <main waste item only>
 CATEGORY: <Recyclable or Compost or Landfill>
 REASON: <one sentence why>"""
 

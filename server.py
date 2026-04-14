@@ -150,23 +150,15 @@ def smart_classify(image: Image.Image) -> dict:
     vit_confidence = vit_result["confidence"]
 
     # Decision logic
-    if gemini_label and gemini_label != vit_label:
-        # Models disagree — if ViT confidence is low, trust Gemini
-        if vit_confidence < 0.70:
-            logger.info(f"Overriding ViT ({vit_label}) with Gemini ({gemini_label})")
-            final_label = gemini_label
-            # Boost confidence since Gemini confirmed
-            final_confidence = 0.82
-            vit_result["probabilities"][gemini_label] = final_confidence
-            vit_result["probabilities"][vit_label] = round(1 - final_confidence, 4)
-        else:
-            # ViT is very confident — keep ViT result
-            final_label = vit_label
-            final_confidence = vit_confidence
-    else:
-        # Both agree or Gemini failed — use ViT result
-        final_label = vit_label
-        final_confidence = vit_confidence
+if gemini_label:
+    logger.info(f"Gemini decision: {gemini_label} (ViT said: {vit_label})")
+    final_label = gemini_label
+    final_confidence = 0.90
+    vit_result["probabilities"][gemini_label] = final_confidence
+else:
+    logger.info(f"Gemini failed, using ViT: {vit_label}")
+    final_label = vit_label
+    final_confidence = vit_confidence
 
     return {
         "label": final_label,

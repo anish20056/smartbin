@@ -102,7 +102,8 @@ Ignore any background, hands, body, or surroundings.
 
 STRICT RULES:
 - ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook, question paper) = Recyclable
-- Food waste, fruit peels, vegetables = Compost
+- Food waste, fruit peels, banana, banana peel, apple, orange peel, vegetables, coffee grounds, eggshells, any fruit or vegetable = Compost
+- Any organic food item = Compost = Compost
 - Cotton, wool, fabric, cloth, handkerchief = Compost
 - Plastic bags, styrofoam, broken glass, electronics = Landfill
 - Plastic bottles, cans, glass bottles, metal = Recyclable

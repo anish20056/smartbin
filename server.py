@@ -135,6 +135,7 @@ REASON: <one sentence why>"""
             gemini_label = None
 
         full_description = f"{description} — {reason}"
+         logger.info(f"Gemini raw response: {text}")
         logger.info(f"Gemini identified: {full_description} → {gemini_label}")
         return full_description, gemini_label
 

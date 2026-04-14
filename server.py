@@ -1,14 +1,3 @@
-"""
-Smart Bin FastAPI Backend
-Exposes REST endpoints consumed by the Streamlit dashboard or any frontend.
-
-Endpoints:
-  POST /classify/image   → classify an uploaded image file
-  POST /classify/base64  → classify a base64-encoded image (for webcam frames)
-  GET  /health           → service health + model status
-  GET  /classes          → returns label list and disposal tips
-"""
-
 import base64
 import io
 import logging
@@ -22,7 +11,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
-from google import genai
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -31,10 +19,6 @@ from classifier import WasteClassifierInference, CLASSES, CONTAMINATION_FLAGS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# ── Configure Gemini Vision ────────────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCnUp9Iz6d3I7g_j608pMP81tplAqZTiSo")
-client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ── Global inference engine ────────────────────────────────────────────────────
 classifier: Optional[WasteClassifierInference] = None
@@ -71,13 +55,12 @@ app.add_middleware(
 
 # ── Response models ────────────────────────────────────────────────────────────
 class ClassificationResult(BaseModel):
-    label:              str
-    confidence:         float
-    probabilities:      dict
-    contamination_tip:  str
-    is_uncertain:       bool
-    inference_ms:       float
-    gemini_description: str = ""
+    label:             str
+    confidence:        float
+    probabilities:     dict
+    contamination_tip: str
+    is_uncertain:      bool
+    inference_ms:      float
 
 
 class Base64Request(BaseModel):
@@ -93,96 +76,6 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {e}")
 
 
-def gemini_identify(image: Image.Image) -> tuple:
-    """Use Gemini Vision to identify the object and suggest waste category."""
-    try:
-     prompt = """You are a waste classification expert. 
-Focus ONLY on the main waste item in the CENTER of the image. 
-Ignore any background, hands, body, or surroundings.
-
-STRICT RULES:
-- ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook, question paper) = Recyclable
-- Food waste, fruit peels, banana, banana peel, apple, orange peel, vegetables, coffee grounds, eggshells, any fruit or vegetable = Compost
-- Any organic food item = Compost = Compost
-- Cotton, wool, fabric, cloth, handkerchief = Compost
-- Plastic bags, styrofoam, broken glass, electronics = Landfill
-- Plastic bottles, cans, glass bottles, metal = Recyclable
-
-Respond in this exact format:
-OBJECT: <main waste item only>
-CATEGORY: <Recyclable or Compost or Landfill>
-REASON: <one sentence why>"""
-
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[prompt, image]
-        )
-        text = response.text.strip()
-        logger.info(f"Gemini raw response: {text}")
-
-        # Parse response
-        lines = {line.split(":")[0].strip(): ":".join(line.split(":")[1:]).strip()
-                 for line in text.split("\n") if ":" in line}
-
-        description = lines.get("OBJECT", "Unknown object")
-        gemini_label = lines.get("CATEGORY", "").strip()
-        reason = lines.get("REASON", "")
-
-        # Validate label
-        if gemini_label not in CLASSES:
-            gemini_label = None
-
-        full_description = f"{description} — {reason}"
-        logger.info(f"Gemini identified: {full_description} → {gemini_label}")
-
-        # Double check if Gemini says Landfill
-        if gemini_label == "Landfill":
-            verify_prompt = f"The item is: {description}. Is it DEFINITELY non-recyclable landfill waste? If it could be recycled or composted, change the category. Reply only one word: Recyclable, Compost, or Landfill"
-            verify = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=verify_prompt
-            )
-            verified = verify.text.strip()
-            if verified in CLASSES:
-                logger.info(f"Landfill double-check result: {verified}")
-                gemini_label = verified
-
-        return full_description, gemini_label
-
-    except Exception as e:
-        logger.error(f"Gemini Vision failed: {e}")
-        return "Could not identify object", None
-
-
-def smart_classify(image: Image.Image) -> dict:
-    """Combine Gemini Vision + ViT classifier for better accuracy."""
-    vit_result = classifier.predict(image)
-    gemini_description, gemini_label = gemini_identify(image)
-
-    vit_label = vit_result["label"]
-    vit_confidence = vit_result["confidence"]
-
-    # Gemini always wins
-    if gemini_label:
-        logger.info(f"Gemini decision: {gemini_label} (ViT said: {vit_label})")
-        final_label = gemini_label
-        final_confidence = 0.90
-        vit_result["probabilities"][gemini_label] = final_confidence
-    else:
-        logger.info(f"Gemini failed, using ViT: {vit_label}")
-        final_label = vit_label
-        final_confidence = vit_confidence
-
-    return {
-        "label":             final_label,
-        "confidence":        round(final_confidence, 4),
-        "probabilities":     vit_result["probabilities"],
-        "contamination_tip": CONTAMINATION_FLAGS[final_label],
-        "is_uncertain":      final_confidence < 0.55,
-        "gemini_description": gemini_description,
-    }
-
-
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -192,7 +85,6 @@ def health():
         "model_ready": classifier is not None,
         "device":      classifier.device if classifier else "N/A",
         "classes":     CLASSES,
-        "gemini":      "enabled",
     }
 
 
@@ -219,7 +111,7 @@ async def classify_image(file: UploadFile = File(...)):
     image = _pil_from_bytes(raw)
 
     t0 = time.perf_counter()
-    result = smart_classify(image)
+    result = classifier.predict(image)
     elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
 
     logger.info(f"classify/image → {result['label']} ({result['confidence']:.2%}) in {elapsed_ms} ms")
@@ -243,7 +135,7 @@ async def classify_base64(body: Base64Request):
     image = _pil_from_bytes(raw)
 
     t0 = time.perf_counter()
-    result = smart_classify(image)
+    result = classifier.predict(image)
     elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
 
     logger.info(f"classify/base64 → {result['label']} ({result['confidence']:.2%}) in {elapsed_ms} ms")

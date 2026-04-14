@@ -24,7 +24,6 @@ from pydantic import BaseModel
 from PIL import Image
 import google.generativeai as genai
 
-# ── Add project root to path so imports work when run directly ─────────────────
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -38,13 +37,12 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCnUp9Iz6d3I7g_j608pMP81
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
-# ── Global inference engine (loaded once at startup) ──────────────────────────
+# ── Global inference engine ────────────────────────────────────────────────────
 classifier: Optional[WasteClassifierInference] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the model on startup, release on shutdown."""
     global classifier
     try:
         logger.info("Loading WasteViT classifier…")
@@ -64,7 +62,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Allow Streamlit dashboard and any local client to call the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -75,12 +72,12 @@ app.add_middleware(
 
 # ── Response models ────────────────────────────────────────────────────────────
 class ClassificationResult(BaseModel):
-    label:             str
-    confidence:        float
-    probabilities:     dict
-    contamination_tip: str
-    is_uncertain:      bool
-    inference_ms:      float
+    label:              str
+    confidence:         float
+    probabilities:      dict
+    contamination_tip:  str
+    is_uncertain:       bool
+    inference_ms:       float
     gemini_description: str = ""
 
 
@@ -98,21 +95,17 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
 
 
 def gemini_identify(image: Image.Image) -> tuple:
-    """
-    Use Gemini Vision to identify the object and suggest waste category.
-    Returns (description, suggested_label)
-    """
+    """Use Gemini Vision to identify the object and suggest waste category."""
     try:
-     prompt = """You are a waste classification expert. Look at this image.
+        prompt = """You are a waste classification expert. Look at this image.
 
 STRICT RULES - follow these exactly:
-- ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook) = Recyclable
+- ANY type of paper (white, printed, written, exam paper, newspaper, tissue, cardboard, notebook, question paper) = Recyclable
 - Food waste, fruit peels, vegetables, coffee grounds, eggshells = Compost
-- Cotton, wool, fabric, cloth = Compost
+- Cotton, wool, fabric, cloth, handkerchief = Compost
 - Plastic bags, styrofoam, broken glass, electronics, chips packets = Landfill
 - Plastic bottles, cans, glass bottles, metal tins = Recyclable
-
-When in doubt between Recyclable and Landfill for paper = always choose Recyclable
+- When in doubt between Recyclable and Landfill for paper = ALWAYS choose Recyclable
 
 Respond in this exact format:
 OBJECT: <what you see>
@@ -121,6 +114,7 @@ REASON: <one sentence why>"""
 
         response = gemini_model.generate_content([prompt, image])
         text = response.text.strip()
+        logger.info(f"Gemini raw response: {text}")
 
         # Parse response
         lines = {line.split(":")[0].strip(): ":".join(line.split(":")[1:]).strip()
@@ -135,8 +129,17 @@ REASON: <one sentence why>"""
             gemini_label = None
 
         full_description = f"{description} — {reason}"
-         logger.info(f"Gemini raw response: {text}")
         logger.info(f"Gemini identified: {full_description} → {gemini_label}")
+
+        # Double check if Gemini says Landfill
+        if gemini_label == "Landfill":
+            verify_prompt = f"The item is: {description}. Is it DEFINITELY non-recyclable landfill waste? If it could be recycled or composted, change the category. Reply only one word: Recyclable, Compost, or Landfill"
+            verify = gemini_model.generate_content(verify_prompt)
+            verified = verify.text.strip()
+            if verified in CLASSES:
+                logger.info(f"Landfill double-check result: {verified}")
+                gemini_label = verified
+
         return full_description, gemini_label
 
     except Exception as e:
@@ -145,35 +148,30 @@ REASON: <one sentence why>"""
 
 
 def smart_classify(image: Image.Image) -> dict:
-    """
-    Combine Gemini Vision + ViT classifier for better accuracy.
-    - If both agree → high confidence result
-    - If they disagree → trust Gemini (it can actually see the object)
-    """
-    # Run both models
+    """Combine Gemini Vision + ViT classifier for better accuracy."""
     vit_result = classifier.predict(image)
     gemini_description, gemini_label = gemini_identify(image)
 
     vit_label = vit_result["label"]
     vit_confidence = vit_result["confidence"]
 
-    # Decision logic
-if gemini_label:
-    logger.info(f"Gemini decision: {gemini_label} (ViT said: {vit_label})")
-    final_label = gemini_label
-    final_confidence = 0.90
-    vit_result["probabilities"][gemini_label] = final_confidence
-else:
-    logger.info(f"Gemini failed, using ViT: {vit_label}")
-    final_label = vit_label
-    final_confidence = vit_confidence
+    # Gemini always wins
+    if gemini_label:
+        logger.info(f"Gemini decision: {gemini_label} (ViT said: {vit_label})")
+        final_label = gemini_label
+        final_confidence = 0.90
+        vit_result["probabilities"][gemini_label] = final_confidence
+    else:
+        logger.info(f"Gemini failed, using ViT: {vit_label}")
+        final_label = vit_label
+        final_confidence = vit_confidence
 
     return {
-        "label": final_label,
-        "confidence": round(final_confidence, 4),
-        "probabilities": vit_result["probabilities"],
+        "label":             final_label,
+        "confidence":        round(final_confidence, 4),
+        "probabilities":     vit_result["probabilities"],
         "contamination_tip": CONTAMINATION_FLAGS[final_label],
-        "is_uncertain": final_confidence < 0.55,
+        "is_uncertain":      final_confidence < 0.55,
         "gemini_description": gemini_description,
     }
 
@@ -187,7 +185,7 @@ def health():
         "model_ready": classifier is not None,
         "device":      classifier.device if classifier else "N/A",
         "classes":     CLASSES,
-        "gemini":      "enabled" if GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE" else "not configured",
+        "gemini":      "enabled",
     }
 
 
